@@ -1,147 +1,162 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Meine GitHub Website</title>
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
+import React, { useEffect, useMemo, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Play, Square, Trash2, TimerReset, PlusCircle } from "lucide-react";
+
+const STORAGE_KEY = "clockify-clone-v1";
+
+function formatSeconds(totalSeconds) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return [hours, minutes, seconds]
+    .map((v) => String(v).padStart(2, "0"))
+    .join(":");
+}
+
+function formatDateTime(timestamp) {
+  if (!timestamp) return "-";
+  return new Date(timestamp).toLocaleString("de-DE");
+}
+
+export default function ClockifyCloneApp() {
+  const [entries, setEntries] = useState([]);
+  const [project, setProject] = useState("");
+  const [task, setTask] = useState("");
+  const [description, setDescription] = useState("");
+  const [runningEntryId, setRunningEntryId] = useState(null);
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      setEntries(parsed.entries || []);
+      setRunningEntryId(parsed.runningEntryId || null);
     }
+  }, []);
 
-    body {
-      font-family: Arial, sans-serif;
-      background: linear-gradient(135deg, #e0f2ff, #ffffff);
-      color: #222;
-      line-height: 1.6;
+  useEffect(() => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ entries, runningEntryId })
+    );
+  }, [entries, runningEntryId]);
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const totalTrackedSeconds = useMemo(() => {
+    return entries.reduce((sum, entry) => {
+      if (entry.isRunning) {
+        return sum + entry.durationSeconds + Math.floor((now - entry.startedAt) / 1000);
+      }
+      return sum + entry.durationSeconds;
+    }, 0);
+  }, [entries, now]);
+
+  const projectTotals = useMemo(() => {
+    const map = new Map();
+    entries.forEach((entry) => {
+      const key = entry.project || "Ohne Projekt";
+      const seconds = entry.isRunning
+        ? entry.durationSeconds + Math.floor((now - entry.startedAt) / 1000)
+        : entry.durationSeconds;
+      map.set(key, (map.get(key) || 0) + seconds);
+    });
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+  }, [entries, now]);
+
+  function startTimer() {
+    if (runningEntryId) return;
+    const newEntry = {
+      id: crypto.randomUUID(),
+      project: project.trim(),
+      task: task.trim(),
+      description: description.trim(),
+      startedAt: Date.now(),
+      endedAt: null,
+      durationSeconds: 0,
+      isRunning: true,
+    };
+    setEntries((prev) => [newEntry, ...prev]);
+    setRunningEntryId(newEntry.id);
+    setProject("");
+    setTask("");
+    setDescription("");
+  }
+
+  function stopTimer() {
+    if (!runningEntryId) return;
+    const endTime = Date.now();
+    setEntries((prev) =>
+      prev.map((entry) => {
+        if (entry.id !== runningEntryId) return entry;
+        const extraSeconds = Math.floor((endTime - entry.startedAt) / 1000);
+        return {
+          ...entry,
+          endedAt: endTime,
+          durationSeconds: entry.durationSeconds + extraSeconds,
+          isRunning: false,
+        };
+      })
+    );
+    setRunningEntryId(null);
+  }
+
+  function deleteEntry(id) {
+    if (id === runningEntryId) {
+      setRunningEntryId(null);
     }
+    setEntries((prev) => prev.filter((entry) => entry.id !== id));
+  }
 
-    header {
-      text-align: center;
-      padding: 80px 20px 40px;
-    }
+  function resetAll() {
+    setEntries([]);
+    setRunningEntryId(null);
+    localStorage.removeItem(STORAGE_KEY);
+  }
 
-    header h1 {
-      font-size: 3rem;
-      margin-bottom: 10px;
-    }
+  const runningEntry = entries.find((entry) => entry.id === runningEntryId);
 
-    header p {
-      font-size: 1.2rem;
-      color: #555;
-    }
+  return (
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Time Tracker</h1>
+            <p className="text-slate-600">Ein einfacher Clockify-ähnlicher Klon mit React und localStorage.</p>
+          </div>
+          <div className="rounded-2xl bg-white px-5 py-4 shadow-sm">
+            <div className="text-sm text-slate-500">Gesamtzeit</div>
+            <div className="text-3xl font-semibold">{formatSeconds(totalTrackedSeconds)}</div>
+          </div>
+        </div>
 
-    nav {
-      display: flex;
-      justify-content: center;
-      gap: 20px;
-      padding: 20px;
-      background: rgba(255,255,255,0.7);
-      backdrop-filter: blur(8px);
-      position: sticky;
-      top: 0;
-    }
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <Card className="lg:col-span-2 rounded-2xl shadow-sm">
+            <CardHeader>
+              <CardTitle>Zeiterfassung</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>Projekt</Label>
+                  <Input value={project} onChange={(e) => setProject(e.target.value)} placeholder="z. B. Website" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Aufgabe</Label>
+                  <Input value={task} onChange={(e) => setTask(e.target.value)} placeholder="z. B. Landingpage bauen" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Beschreibung</Label>
+                  <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Kurze Notiz" />
+                </div>
+              </div>
 
-    nav a {
-      text-decoration: none;
-      color: #0077cc;
-      font-weight: bold;
-    }
-
-    nav a:hover {
-      color: #005999;
-    }
-
-    section {
-      max-width: 900px;
-      margin: 40px auto;
-      padding: 0 20px;
-    }
-
-    .card {
-      background: white;
-      padding: 25px;
-      border-radius: 18px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
-      margin-bottom: 25px;
-    }
-
-    h2 {
-      margin-bottom: 15px;
-      color: #0077cc;
-    }
-
-    footer {
-      text-align: center;
-      padding: 30px 20px;
-      color: #777;
-      font-size: 0.95rem;
-    }
-
-    .button {
-      display: inline-block;
-      margin-top: 15px;
-      padding: 12px 20px;
-      background: #0077cc;
-      color: white;
-      text-decoration: none;
-      border-radius: 10px;
-      transition: 0.2s;
-    }
-
-    .button:hover {
-      background: #005999;
-    }
-  </style>
-</head>
-<body>
-
-  <nav>
-    <a href="#home">Start</a>
-    <a href="#about">Über mich</a>
-    <a href="#projects">Projekte</a>
-    <a href="#contact">Kontakt</a>
-  </nav>
-
-  <header id="home">
-    <h1>Willkommen auf meiner Website</h1>
-    <p>Erstellt mit GitHub Pages</p>
-  </header>
-
-  <section id="about">
-    <div class="card">
-      <h2>Über mich</h2>
-      <p>
-        Hallo, ich bin [Dein Name]. Hier kannst du etwas über dich schreiben,
-        zum Beispiel was du machst, was dich interessiert oder woran du arbeitest.
-      </p>
-    </div>
-  </section>
-
-  <section id="projects">
-    <div class="card">
-      <h2>Meine Projekte</h2>
-      <p>
-        Hier kannst du deine Projekte, Ideen oder Arbeiten vorstellen.
-      </p>
-      <a class="button" href="https://github.com/" target="_blank">Mein GitHub</a>
-    </div>
-  </section>
-
-  <section id="contact">
-    <div class="card">
-      <h2>Kontakt</h2>
-      <p>
-        Du kannst hier deine E-Mail, Social Media oder andere Kontaktdaten einfügen.
-      </p>
-    </div>
-  </section>
-
-  <footer>
-    © 2026 Meine Website – gehostet mit GitHub Pages
-  </footer>
-
-</body>
-</html>
+              <div className="flex flex-wrap gap-3">
+                <Button onClick={startTimer} disabled={!!runningEntryId} className="rounded
