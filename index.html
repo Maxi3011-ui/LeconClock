@@ -1,1 +1,147 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meine GitHub Website</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #e0f2ff, #ffffff);
+      color: #222;
+      line-height: 1.6;
+    }
+
+    header {
+      text-align: center;
+      padding: 80px 20px 40px;
+    }
+
+    header h1 {
+      font-size: 3rem;
+      margin-bottom: 10px;
+    }
+
+    header p {
+      font-size: 1.2rem;
+      color: #555;
+    }
+
+    nav {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      padding: 20px;
+      background: rgba(255,255,255,0.7);
+      backdrop-filter: blur(8px);
+      position: sticky;
+      top: 0;
+    }
+
+    nav a {
+      text-decoration: none;
+      color: #0077cc;
+      font-weight: bold;
+    }
+
+    nav a:hover {
+      color: #005999;
+    }
+
+    section {
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 0 20px;
+    }
+
+    .card {
+      background: white;
+      padding: 25px;
+      border-radius: 18px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+      margin-bottom: 25px;
+    }
+
+    h2 {
+      margin-bottom: 15px;
+      color: #0077cc;
+    }
+
+    footer {
+      text-align: center;
+      padding: 30px 20px;
+      color: #777;
+      font-size: 0.95rem;
+    }
+
+    .button {
+      display: inline-block;
+      margin-top: 15px;
+      padding: 12px 20px;
+      background: #0077cc;
+      color: white;
+      text-decoration: none;
+      border-radius: 10px;
+      transition: 0.2s;
+    }
+
+    .button:hover {
+      background: #005999;
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <a href="#home">Start</a>
+    <a href="#about">Über mich</a>
+    <a href="#projects">Projekte</a>
+    <a href="#contact">Kontakt</a>
+  </nav>
+
+  <header id="home">
+    <h1>Willkommen auf meiner Website</h1>
+    <p>Erstellt mit GitHub Pages</p>
+  </header>
+
+  <section id="about">
+    <div class="card">
+      <h2>Über mich</h2>
+      <p>
+        Hallo, ich bin [Dein Name]. Hier kannst du etwas über dich schreiben,
+        zum Beispiel was du machst, was dich interessiert oder woran du arbeitest.
+      </p>
+    </div>
+  </section>
+
+  <section id="projects">
+    <div class="card">
+      <h2>Meine Projekte</h2>
+      <p>
+        Hier kannst du deine Projekte, Ideen oder Arbeiten vorstellen.
+      </p>
+      <a class="button" href="https://github.com/" target="_blank">Mein GitHub</a>
+    </div>
+  </section>
+
+  <section id="contact">
+    <div class="card">
+      <h2>Kontakt</h2>
+      <p>
+        Du kannst hier deine E-Mail, Social Media oder andere Kontaktdaten einfügen.
+      </p>
+    </div>
+  </section>
+
+  <footer>
+    © 2026 Meine Website – gehostet mit GitHub Pages
+  </footer>
+
+</body>
+</html>
