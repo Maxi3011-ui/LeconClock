@@ -1,162 +1,35 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Play, Square, Trash2, TimerReset, PlusCircle } from "lucide-react";
+<!DOCTYPE html>
+<html>
+<head>
+<title>LeconClock</title>
+</head>
 
-const STORAGE_KEY = "clockify-clone-v1";
+<body>
 
-function formatSeconds(totalSeconds) {
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  return [hours, minutes, seconds]
-    .map((v) => String(v).padStart(2, "0"))
-    .join(":");
+<h1>LeconClock</h1>
+
+<p id="time">0 Sekunden</p>
+
+<button onclick="start()">Start</button>
+<button onclick="stop()">Stop</button>
+
+<script>
+
+let seconds = 0
+let timer
+
+function start(){
+  timer = setInterval(function(){
+    seconds++
+    document.getElementById("time").innerText = seconds + " Sekunden"
+  },1000)
 }
 
-function formatDateTime(timestamp) {
-  if (!timestamp) return "-";
-  return new Date(timestamp).toLocaleString("de-DE");
+function stop(){
+  clearInterval(timer)
 }
 
-export default function ClockifyCloneApp() {
-  const [entries, setEntries] = useState([]);
-  const [project, setProject] = useState("");
-  const [task, setTask] = useState("");
-  const [description, setDescription] = useState("");
-  const [runningEntryId, setRunningEntryId] = useState(null);
-  const [now, setNow] = useState(Date.now());
+</script>
 
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      setEntries(parsed.entries || []);
-      setRunningEntryId(parsed.runningEntryId || null);
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ entries, runningEntryId })
-    );
-  }, [entries, runningEntryId]);
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const totalTrackedSeconds = useMemo(() => {
-    return entries.reduce((sum, entry) => {
-      if (entry.isRunning) {
-        return sum + entry.durationSeconds + Math.floor((now - entry.startedAt) / 1000);
-      }
-      return sum + entry.durationSeconds;
-    }, 0);
-  }, [entries, now]);
-
-  const projectTotals = useMemo(() => {
-    const map = new Map();
-    entries.forEach((entry) => {
-      const key = entry.project || "Ohne Projekt";
-      const seconds = entry.isRunning
-        ? entry.durationSeconds + Math.floor((now - entry.startedAt) / 1000)
-        : entry.durationSeconds;
-      map.set(key, (map.get(key) || 0) + seconds);
-    });
-    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
-  }, [entries, now]);
-
-  function startTimer() {
-    if (runningEntryId) return;
-    const newEntry = {
-      id: crypto.randomUUID(),
-      project: project.trim(),
-      task: task.trim(),
-      description: description.trim(),
-      startedAt: Date.now(),
-      endedAt: null,
-      durationSeconds: 0,
-      isRunning: true,
-    };
-    setEntries((prev) => [newEntry, ...prev]);
-    setRunningEntryId(newEntry.id);
-    setProject("");
-    setTask("");
-    setDescription("");
-  }
-
-  function stopTimer() {
-    if (!runningEntryId) return;
-    const endTime = Date.now();
-    setEntries((prev) =>
-      prev.map((entry) => {
-        if (entry.id !== runningEntryId) return entry;
-        const extraSeconds = Math.floor((endTime - entry.startedAt) / 1000);
-        return {
-          ...entry,
-          endedAt: endTime,
-          durationSeconds: entry.durationSeconds + extraSeconds,
-          isRunning: false,
-        };
-      })
-    );
-    setRunningEntryId(null);
-  }
-
-  function deleteEntry(id) {
-    if (id === runningEntryId) {
-      setRunningEntryId(null);
-    }
-    setEntries((prev) => prev.filter((entry) => entry.id !== id));
-  }
-
-  function resetAll() {
-    setEntries([]);
-    setRunningEntryId(null);
-    localStorage.removeItem(STORAGE_KEY);
-  }
-
-  const runningEntry = entries.find((entry) => entry.id === runningEntryId);
-
-  return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Time Tracker</h1>
-            <p className="text-slate-600">Ein einfacher Clockify-ähnlicher Klon mit React und localStorage.</p>
-          </div>
-          <div className="rounded-2xl bg-white px-5 py-4 shadow-sm">
-            <div className="text-sm text-slate-500">Gesamtzeit</div>
-            <div className="text-3xl font-semibold">{formatSeconds(totalTrackedSeconds)}</div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <Card className="lg:col-span-2 rounded-2xl shadow-sm">
-            <CardHeader>
-              <CardTitle>Zeiterfassung</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div className="space-y-2">
-                  <Label>Projekt</Label>
-                  <Input value={project} onChange={(e) => setProject(e.target.value)} placeholder="z. B. Website" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Aufgabe</Label>
-                  <Input value={task} onChange={(e) => setTask(e.target.value)} placeholder="z. B. Landingpage bauen" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Beschreibung</Label>
-                  <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Kurze Notiz" />
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                <Button onClick={startTimer} disabled={!!runningEntryId} className="rounded
+</body>
+</html>
