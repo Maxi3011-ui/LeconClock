@@ -1,265 +1,613 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Play, Square, Trash2, TimerReset, PlusCircle } from "lucide-react";
-
-const STORAGE_KEY = "clockify-clone-v1";
-
-function formatSeconds(totalSeconds) {
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  return [hours, minutes, seconds]
-    .map((v) => String(v).padStart(2, "0"))
-    .join(":");
-}
-
-function formatDateTime(timestamp) {
-  if (!timestamp) return "-";
-  return new Date(timestamp).toLocaleString("de-DE");
-}
-
-export default function ClockifyCloneApp() {
-  const [entries, setEntries] = useState([]);
-  const [project, setProject] = useState("");
-  const [task, setTask] = useState("");
-  const [description, setDescription] = useState("");
-  const [runningEntryId, setRunningEntryId] = useState(null);
-  const [now, setNow] = useState(Date.now());
-
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      setEntries(parsed.entries || []);
-      setRunningEntryId(parsed.runningEntryId || null);
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LeconClock</title>
+  <style>
+    :root{
+      --bg:#f4f7fb;
+      --card:#ffffff;
+      --text:#162033;
+      --muted:#6b7280;
+      --line:#e5e7eb;
+      --primary:#2563eb;
+      --primary-dark:#1d4ed8;
+      --success:#16a34a;
+      --danger:#dc2626;
+      --shadow:0 12px 35px rgba(22,32,51,0.08);
+      --radius:20px;
     }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ entries, runningEntryId })
-    );
-  }, [entries, runningEntryId]);
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const totalTrackedSeconds = useMemo(() => {
-    return entries.reduce((sum, entry) => {
-      if (entry.isRunning) {
-        return sum + entry.durationSeconds + Math.floor((now - entry.startedAt) / 1000);
-      }
-      return sum + entry.durationSeconds;
-    }, 0);
-  }, [entries, now]);
-
-  const projectTotals = useMemo(() => {
-    const map = new Map();
-    entries.forEach((entry) => {
-      const key = entry.project || "Ohne Projekt";
-      const seconds = entry.isRunning
-        ? entry.durationSeconds + Math.floor((now - entry.startedAt) / 1000)
-        : entry.durationSeconds;
-      map.set(key, (map.get(key) || 0) + seconds);
-    });
-    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
-  }, [entries, now]);
-
-  function startTimer() {
-    if (runningEntryId) return;
-    const newEntry = {
-      id: crypto.randomUUID(),
-      project: project.trim(),
-      task: task.trim(),
-      description: description.trim(),
-      startedAt: Date.now(),
-      endedAt: null,
-      durationSeconds: 0,
-      isRunning: true,
-    };
-    setEntries((prev) => [newEntry, ...prev]);
-    setRunningEntryId(newEntry.id);
-    setProject("");
-    setTask("");
-    setDescription("");
-  }
-
-  function stopTimer() {
-    if (!runningEntryId) return;
-    const endTime = Date.now();
-    setEntries((prev) =>
-      prev.map((entry) => {
-        if (entry.id !== runningEntryId) return entry;
-        const extraSeconds = Math.floor((endTime - entry.startedAt) / 1000);
-        return {
-          ...entry,
-          endedAt: endTime,
-          durationSeconds: entry.durationSeconds + extraSeconds,
-          isRunning: false,
-        };
-      })
-    );
-    setRunningEntryId(null);
-  }
-
-  function deleteEntry(id) {
-    if (id === runningEntryId) {
-      setRunningEntryId(null);
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Arial,sans-serif;
+      background:linear-gradient(180deg,#eef4ff 0%,var(--bg) 220px);
+      color:var(--text);
     }
-    setEntries((prev) => prev.filter((entry) => entry.id !== id));
-  }
-
-  function resetAll() {
-    setEntries([]);
-    setRunningEntryId(null);
-    localStorage.removeItem(STORAGE_KEY);
-  }
-
-  const runningEntry = entries.find((entry) => entry.id === runningEntryId);
-
-  return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Time Tracker</h1>
-            <p className="text-slate-600">Ein einfacher Clockify-ähnlicher Klon mit React und localStorage.</p>
-          </div>
-          <div className="rounded-2xl bg-white px-5 py-4 shadow-sm">
-            <div className="text-sm text-slate-500">Gesamtzeit</div>
-            <div className="text-3xl font-semibold">{formatSeconds(totalTrackedSeconds)}</div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <Card className="lg:col-span-2 rounded-2xl shadow-sm">
-            <CardHeader>
-              <CardTitle>Zeiterfassung</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div className="space-y-2">
-                  <Label>Projekt</Label>
-                  <Input value={project} onChange={(e) => setProject(e.target.value)} placeholder="z. B. Website" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Aufgabe</Label>
-                  <Input value={task} onChange={(e) => setTask(e.target.value)} placeholder="z. B. Landingpage bauen" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Beschreibung</Label>
-                  <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Kurze Notiz" />
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                <Button onClick={startTimer} disabled={!!runningEntryId} className="rounded-xl">
-                  <Play className="mr-2 h-4 w-4" /> Start
-                </Button>
-                <Button onClick={stopTimer} disabled={!runningEntryId} variant="secondary" className="rounded-xl">
-                  <Square className="mr-2 h-4 w-4" /> Stop
-                </Button>
-                <Button onClick={resetAll} variant="outline" className="rounded-xl">
-                  <TimerReset className="mr-2 h-4 w-4" /> Alles zurücksetzen
-                </Button>
-              </div>
-
-              <div className="rounded-2xl border border-dashed p-4">
-                <div className="text-sm text-slate-500">Aktiver Timer</div>
-                {runningEntry ? (
-                  <div className="mt-2 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <div className="font-medium">{runningEntry.project || "Ohne Projekt"} · {runningEntry.task || "Ohne Aufgabe"}</div>
-                      <div className="text-sm text-slate-500">{runningEntry.description || "Keine Beschreibung"}</div>
-                    </div>
-                    <div className="text-2xl font-semibold">
-                      {formatSeconds(runningEntry.durationSeconds + Math.floor((now - runningEntry.startedAt) / 1000))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-2 text-slate-500">Gerade läuft kein Timer.</div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-2xl shadow-sm">
-            <CardHeader>
-              <CardTitle>Projektübersicht</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {projectTotals.length === 0 ? (
-                  <div className="text-slate-500">Noch keine Einträge vorhanden.</div>
-                ) : (
-                  projectTotals.map(([name, seconds]) => (
-                    <div key={name} className="flex items-center justify-between rounded-xl border p-3">
-                      <span className="font-medium">{name}</span>
-                      <span className="text-slate-600">{formatSeconds(seconds)}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card className="rounded-2xl shadow-sm">
-          <CardHeader>
-            <CardTitle>Einträge</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {entries.length === 0 ? (
-                <div className="flex items-center gap-2 text-slate-500">
-                  <PlusCircle className="h-4 w-4" /> Starte deinen ersten Timer.
-                </div>
-              ) : (
-                entries.map((entry) => {
-                  const seconds = entry.isRunning
-                    ? entry.durationSeconds + Math.floor((now - entry.startedAt) / 1000)
-                    : entry.durationSeconds;
-                  return (
-                    <div key={entry.id} className="grid grid-cols-1 gap-3 rounded-2xl border p-4 md:grid-cols-6 md:items-center">
-                      <div>
-                        <div className="text-xs uppercase tracking-wide text-slate-400">Projekt</div>
-                        <div className="font-medium">{entry.project || "Ohne Projekt"}</div>
-                      </div>
-                      <div>
-                        <div className="text-xs uppercase tracking-wide text-slate-400">Aufgabe</div>
-                        <div>{entry.task || "-"}</div>
-                      </div>
-                      <div>
-                        <div className="text-xs uppercase tracking-wide text-slate-400">Beschreibung</div>
-                        <div>{entry.description || "-"}</div>
-                      </div>
-                      <div>
-                        <div className="text-xs uppercase tracking-wide text-slate-400">Start</div>
-                        <div>{formatDateTime(entry.startedAt)}</div>
-                      </div>
-                      <div>
-                        <div className="text-xs uppercase tracking-wide text-slate-400">Dauer</div>
-                        <div className="font-semibold">{formatSeconds(seconds)}</div>
-                      </div>
-                      <div className="flex justify-start md:justify-end">
-                        <Button variant="ghost" onClick={() => deleteEntry(entry.id)} className="rounded-xl text-slate-600 hover:text-red-600">
-                          <Trash2 className="mr-2 h-4 w-4" /> Löschen
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </CardContent>
-        </Card>
+    .container{
+      max-width:1100px;
+      margin:0 auto;
+      padding:28px 18px 80px;
+    }
+    .hero{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:20px;
+      flex-wrap:wrap;
+      margin-bottom:20px;
+    }
+    .hero h1{
+      margin:0;
+      font-size:38px;
+    }
+    .hero p{
+      margin:8px 0 0;
+      color:var(--muted);
+    }
+    .pill{
+      display:inline-block;
+      background:rgba(37,99,235,0.1);
+      color:var(--primary);
+      padding:8px 14px;
+      border-radius:999px;
+      font-weight:700;
+      font-size:13px;
+      margin-bottom:10px;
+    }
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:16px;
+      margin-bottom:18px;
+    }
+    .main{
+      display:grid;
+      grid-template-columns:1.3fr 0.7fr;
+      gap:18px;
+    }
+    .card{
+      background:var(--card);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:22px;
+    }
+    .stat-label{
+      color:var(--muted);
+      font-size:13px;
+      margin-bottom:8px;
+    }
+    .stat-value{
+      font-size:28px;
+      font-weight:800;
+    }
+    h2{
+      margin:0 0 6px;
+      font-size:22px;
+    }
+    .sub{
+      color:var(--muted);
+      font-size:14px;
+      margin-bottom:16px;
+    }
+    .form-grid{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:14px;
+      margin-bottom:14px;
+    }
+    .full{
+      grid-column:1 / -1;
+    }
+    label{
+      display:block;
+      font-size:13px;
+      font-weight:700;
+      margin-bottom:8px;
+    }
+    input,textarea{
+      width:100%;
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:13px 14px;
+      font:inherit;
+      background:#fff;
+    }
+    textarea{
+      min-height:90px;
+      resize:vertical;
+    }
+    .buttons{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      margin-top:8px;
+    }
+    button{
+      border:none;
+      border-radius:14px;
+      padding:13px 18px;
+      font:inherit;
+      font-weight:700;
+      cursor:pointer;
+    }
+    .btn-primary{background:var(--primary);color:#fff}
+    .btn-primary:hover{background:var(--primary-dark)}
+    .btn-secondary{background:#e8f0ff;color:var(--primary)}
+    .btn-success{background:#dcfce7;color:var(--success)}
+    .btn-danger{background:#fee2e2;color:var(--danger)}
+    button:disabled{opacity:.55;cursor:not-allowed}
+    .active{
+      margin-top:18px;
+      padding:18px;
+      border-radius:18px;
+      background:linear-gradient(135deg,#eff6ff,#f8fbff);
+      border:1px solid #dbeafe;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:16px;
+      flex-wrap:wrap;
+    }
+    .badge{
+      display:inline-block;
+      padding:6px 10px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:800;
+      margin-bottom:10px;
+      background:rgba(148,163,184,0.15);
+      color:#64748b;
+    }
+    .timer-big{
+      font-size:34px;
+      font-weight:900;
+      letter-spacing:1px;
+    }
+    .project-list,.entry-list{
+      display:grid;
+      gap:12px;
+    }
+    .project-item{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      background:#f8fbff;
+      border:1px solid #e6eefb;
+      border-radius:16px;
+      padding:14px;
+    }
+    .entry{
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:16px;
+      background:#fff;
+    }
+    .entry-top{
+      display:flex;
+      justify-content:space-between;
+      gap:14px;
+      align-items:start;
+      flex-wrap:wrap;
+      margin-bottom:10px;
+    }
+    .entry-title{
+      font-size:17px;
+      font-weight:800;
+      margin-bottom:4px;
+    }
+    .muted{color:var(--muted)}
+    .meta{
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:10px;
+      margin-top:10px;
+    }
+    .meta-box{
+      background:#f8fafc;
+      border-radius:14px;
+      padding:12px;
+    }
+    .meta-label{
+      font-size:11px;
+      color:var(--muted);
+      text-transform:uppercase;
+      letter-spacing:.4px;
+      margin-bottom:4px;
+    }
+    .empty{
+      border:1px dashed #cbd5e1;
+      border-radius:16px;
+      padding:22px;
+      color:var(--muted);
+      text-align:center;
+      background:#fcfdff;
+    }
+    @media (max-width:900px){
+      .grid,.main,.form-grid,.meta{grid-template-columns:1fr 1fr}
+    }
+    @media (max-width:700px){
+      .grid,.main,.form-grid,.meta{grid-template-columns:1fr}
+      .hero h1{font-size:30px}
+      .timer-big{font-size:28px}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <div>
+        <div class="pill">LECONCLOCK</div>
+        <h1>Zeiterfassung</h1>
+        <p>Schöne Clockify-ähnliche App direkt für GitHub Pages.</p>
+      </div>
+      <div class="card">
+        <div class="stat-label">Heute</div>
+        <div class="stat-value" id="todayTotal">00:00:00</div>
       </div>
     </div>
-  );
-}
+
+    <div class="grid">
+      <div class="card">
+        <div class="stat-label">Gesamtzeit</div>
+        <div class="stat-value" id="totalTime">00:00:00</div>
+      </div>
+      <div class="card">
+        <div class="stat-label">Einträge</div>
+        <div class="stat-value" id="entryCount">0</div>
+      </div>
+      <div class="card">
+        <div class="stat-label">Projekte</div>
+        <div class="stat-value" id="projectCount">0</div>
+      </div>
+      <div class="card">
+        <div class="stat-label">Status</div>
+        <div class="stat-value" id="runningStatus">Aus</div>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="card">
+        <h2>Zeiterfassung</h2>
+        <div class="sub">Projekt, Aufgabe und Beschreibung eingeben und starten.</div>
+
+        <div class="form-grid">
+          <div>
+            <label for="project">Projekt</label>
+            <input id="project" placeholder="z. B. Mandant A">
+          </div>
+          <div>
+            <label for="task">Aufgabe</label>
+            <input id="task" placeholder="z. B. Gutachten">
+          </div>
+          <div>
+            <label for="tag">Kategorie</label>
+            <input id="tag" placeholder="z. B. Admin">
+          </div>
+          <div class="full">
+            <label for="description">Beschreibung</label>
+            <textarea id="description" placeholder="Kurze Notiz"></textarea>
+          </div>
+        </div>
+
+        <div class="buttons">
+          <button class="btn-primary" id="startBtn">Start</button>
+          <button class="btn-secondary" id="stopBtn" disabled>Stop</button>
+          <button class="btn-success" id="manualBtn">+ 30 Min hinzufügen</button>
+          <button class="btn-danger" id="resetBtn">Alles löschen</button>
+        </div>
+
+        <div class="active">
+          <div>
+            <div class="badge" id="badge">KEIN TIMER AKTIV</div>
+            <div class="entry-title" id="activeTitle">Gerade läuft kein Timer.</div>
+            <div class="muted" id="activeDescription">Starte einen neuen Eintrag.</div>
+          </div>
+          <div class="timer-big" id="liveTimer">00:00:00</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Projektübersicht</h2>
+        <div class="sub">Summen pro Projekt.</div>
+        <div id="projectList" class="project-list"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px;">
+      <h2>Einträge</h2>
+      <div class="sub">Alle bisherigen Zeiteinträge.</div>
+      <div id="entryList" class="entry-list"></div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = "leconclock-storage-v1";
+
+    const el = {
+      project: document.getElementById("project"),
+      task: document.getElementById("task"),
+      tag: document.getElementById("tag"),
+      description: document.getElementById("description"),
+      startBtn: document.getElementById("startBtn"),
+      stopBtn: document.getElementById("stopBtn"),
+      manualBtn: document.getElementById("manualBtn"),
+      resetBtn: document.getElementById("resetBtn"),
+      totalTime: document.getElementById("totalTime"),
+      todayTotal: document.getElementById("todayTotal"),
+      entryCount: document.getElementById("entryCount"),
+      projectCount: document.getElementById("projectCount"),
+      runningStatus: document.getElementById("runningStatus"),
+      badge: document.getElementById("badge"),
+      activeTitle: document.getElementById("activeTitle"),
+      activeDescription: document.getElementById("activeDescription"),
+      liveTimer: document.getElementById("liveTimer"),
+      projectList: document.getElementById("projectList"),
+      entryList: document.getElementById("entryList")
+    };
+
+    let state = { entries: [], runningId: null };
+
+    function formatSeconds(totalSeconds) {
+      const s = Math.max(0, Math.floor(totalSeconds));
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const sec = s % 60;
+      return [h, m, sec].map(v => String(v).padStart(2, "0")).join(":");
+    }
+
+    function formatDate(ts) {
+      return new Date(ts).toLocaleString("de-DE");
+    }
+
+    function isToday(ts) {
+      const d = new Date(ts);
+      const n = new Date();
+      return d.getDate() === n.getDate() &&
+             d.getMonth() === n.getMonth() &&
+             d.getFullYear() === n.getFullYear();
+    }
+
+    function save() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function load() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) return;
+      try {
+        state = JSON.parse(saved);
+      } catch {
+        state = { entries: [], runningId: null };
+      }
+    }
+
+    function entrySeconds(entry) {
+      if (entry.isRunning) {
+        return entry.durationSeconds + Math.floor((Date.now() - entry.startedAt) / 1000);
+      }
+      return entry.durationSeconds;
+    }
+
+    function runningEntry() {
+      return state.entries.find(e => e.id === state.runningId) || null;
+    }
+
+    function escapeHtml(text) {
+      return String(text)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function renderProjects() {
+      const totals = {};
+      state.entries.forEach(entry => {
+        const key = entry.project || "Ohne Projekt";
+        totals[key] = (totals[key] || 0) + entrySeconds(entry);
+      });
+
+      const items = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+      el.projectList.innerHTML = "";
+
+      if (!items.length) {
+        el.projectList.innerHTML = '<div class="empty">Noch keine Projekte vorhanden.</div>';
+        return;
+      }
+
+      items.forEach(([name, seconds]) => {
+        const div = document.createElement("div");
+        div.className = "project-item";
+        div.innerHTML = `
+          <div>
+            <div class="entry-title" style="font-size:16px; margin:0;">${escapeHtml(name)}</div>
+            <div class="muted">Gesammelte Zeit</div>
+          </div>
+          <div style="font-weight:800;">${formatSeconds(seconds)}</div>
+        `;
+        el.projectList.appendChild(div);
+      });
+    }
+
+    function deleteEntry(id) {
+      if (state.runningId === id) state.runningId = null;
+      state.entries = state.entries.filter(e => e.id !== id);
+      save();
+      render();
+    }
+
+    function renderEntries() {
+      el.entryList.innerHTML = "";
+
+      if (!state.entries.length) {
+        el.entryList.innerHTML = '<div class="empty">Noch keine Einträge. Starte den ersten Timer.</div>';
+        return;
+      }
+
+      state.entries.forEach(entry => {
+        const div = document.createElement("div");
+        const seconds = entrySeconds(entry);
+        div.className = "entry";
+        div.innerHTML = `
+          <div class="entry-top">
+            <div>
+              <div class="entry-title">${escapeHtml(entry.project || "Ohne Projekt")} · ${escapeHtml(entry.task || "Ohne Aufgabe")}</div>
+              <div class="muted">${escapeHtml(entry.description || "Keine Beschreibung")}</div>
+            </div>
+            <div>
+              <button class="btn-danger" data-id="${entry.id}">Löschen</button>
+            </div>
+          </div>
+          <div class="meta">
+            <div class="meta-box">
+              <div class="meta-label">Kategorie</div>
+              <div>${escapeHtml(entry.tag || "-")}</div>
+            </div>
+            <div class="meta-box">
+              <div class="meta-label">Start</div>
+              <div>${formatDate(entry.startedAt)}</div>
+            </div>
+            <div class="meta-box">
+              <div class="meta-label">Ende</div>
+              <div>${entry.endedAt ? formatDate(entry.endedAt) : "läuft noch"}</div>
+            </div>
+            <div class="meta-box">
+              <div class="meta-label">Dauer</div>
+              <div style="font-weight:800;">${formatSeconds(seconds)}</div>
+            </div>
+          </div>
+        `;
+        el.entryList.appendChild(div);
+      });
+
+      el.entryList.querySelectorAll("[data-id]").forEach(btn => {
+        btn.addEventListener("click", () => deleteEntry(btn.dataset.id));
+      });
+    }
+
+    function renderStats() {
+      const total = state.entries.reduce((sum, e) => sum + entrySeconds(e), 0);
+      const today = state.entries.reduce((sum, e) => isToday(e.startedAt) ? sum + entrySeconds(e) : sum, 0);
+      const projects = new Set(state.entries.map(e => e.project || "Ohne Projekt"));
+
+      el.totalTime.textContent = formatSeconds(total);
+      el.todayTotal.textContent = formatSeconds(today);
+      el.entryCount.textContent = String(state.entries.length);
+      el.projectCount.textContent = String(state.entries.length ? projects.size : 0);
+    }
+
+    function renderActive() {
+      const current = runningEntry();
+
+      if (!current) {
+        el.badge.textContent = "KEIN TIMER AKTIV";
+        el.badge.style.background = "rgba(148,163,184,0.15)";
+        el.badge.style.color = "#64748b";
+        el.activeTitle.textContent = "Gerade läuft kein Timer.";
+        el.activeDescription.textContent = "Starte einen neuen Eintrag.";
+        el.liveTimer.textContent = "00:00:00";
+        el.startBtn.disabled = false;
+        el.stopBtn.disabled = true;
+        el.runningStatus.textContent = "Aus";
+        return;
+      }
+
+      el.badge.textContent = "TIMER AKTIV";
+      el.badge.style.background = "rgba(22,163,74,0.12)";
+      el.badge.style.color = "#16a34a";
+      el.activeTitle.textContent = (current.project || "Ohne Projekt") + " · " + (current.task || "Ohne Aufgabe");
+      el.activeDescription.textContent = current.description || "Keine Beschreibung";
+      el.liveTimer.textContent = formatSeconds(entrySeconds(current));
+      el.startBtn.disabled = true;
+      el.stopBtn.disabled = false;
+      el.runningStatus.textContent = "An";
+    }
+
+    function render() {
+      renderStats();
+      renderActive();
+      renderProjects();
+      renderEntries();
+    }
+
+    function startTimer() {
+      if (state.runningId) return;
+
+      const entry = {
+        id: String(Date.now()) + Math.random().toString(16).slice(2),
+        project: el.project.value.trim(),
+        task: el.task.value.trim(),
+        tag: el.tag.value.trim(),
+        description: el.description.value.trim(),
+        startedAt: Date.now(),
+        endedAt: null,
+        durationSeconds: 0,
+        isRunning: true
+      };
+
+      state.entries.unshift(entry);
+      state.runningId = entry.id;
+      save();
+      render();
+
+      el.project.value = "";
+      el.task.value = "";
+      el.tag.value = "";
+      el.description.value = "";
+    }
+
+    function stopTimer() {
+      const current = runningEntry();
+      if (!current) return;
+
+      const end = Date.now();
+      current.durationSeconds += Math.floor((end - current.startedAt) / 1000);
+      current.endedAt = end;
+      current.isRunning = false;
+      state.runningId = null;
+      save();
+      render();
+    }
+
+    function addManualEntry() {
+      const now = Date.now();
+      const seconds = 30 * 60;
+
+      state.entries.unshift({
+        id: String(now) + Math.random().toString(16).slice(2),
+        project: el.project.value.trim() || "Manueller Eintrag",
+        task: el.task.value.trim() || "Nachgetragen",
+        tag: el.tag.value.trim() || "Manuell",
+        description: el.description.value.trim() || "Automatisch hinzugefügter 30-Minuten-Eintrag",
+        startedAt: now - seconds * 1000,
+        endedAt: now,
+        durationSeconds: seconds,
+        isRunning: false
+      });
+
+      save();
+      render();
+    }
+
+    function resetAll() {
+      if (!confirm("Wirklich alle Einträge löschen?")) return;
+      state = { entries: [], runningId: null };
+      save();
+      render();
+    }
+
+    el.startBtn.addEventListener("click", startTimer);
+    el.stopBtn.addEventListener("click", stopTimer);
+    el.manualBtn.addEventListener("click", addManualEntry);
+    el.resetBtn.addEventListener("click", resetAll);
+
+    load();
+    render();
+    setInterval(render, 1000);
+  </script>
+</body>
+</html>
